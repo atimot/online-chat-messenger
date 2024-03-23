@@ -8,15 +8,7 @@ services:
       - .:/work
     command: sleep infinity
 
-  client1:
-    build: 
-      context: .
-      dockerfile: ./Dockerfile
-    volumes:
-      - .:/work
-    command: sleep infinity
-
-  client2:
+  client:
     build: 
       context: .
       dockerfile: ./Dockerfile

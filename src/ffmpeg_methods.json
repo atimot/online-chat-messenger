@@ -1,0 +1,32 @@
+{
+    "compression": {
+        "hoge": "hoge",
+        "-i": "input.file",
+        "-o": "output.file"
+    },
+    "resolution_change": {
+        "hoge": "hoge",
+        "-i": "input.file",
+        "-o": "output.file"
+    },
+    "aspect_raito_change": {
+        "hoge": "hoge",
+        "-i": "input.file",
+        "-o": "output.file"
+    },
+    "to_audio": {
+        "hoge": "hoge",
+        "-i": "input.file",
+        "-o": "output.file"
+    },
+    "crop_gif": {
+        "hoge": "hoge",
+        "-i": "input.file",
+        "-o": "output.file"
+    },
+    "crop_webm": {
+        "hoge": "hoge",
+        "-i": "input.file",
+        "-o": "output.file"
+    }
+}

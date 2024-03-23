@@ -1,51 +1,69 @@
+# サーバーを起動する時に自分のIPアドレスを出力する
+# ポートは9001
 import socket
-from datetime import datetime, timedelta
-import threading
+import os
+from pathlib import Path
+import hashlib
+import mimetypes
 
 class Server:
-    SERVER_ADDRESS = socket.gethostbyname(socket.gethostname())
+    SERVER_ADDRESS = '0.0.0.0'
     SERVER_PORT = 9001
+    STREAM_RATE = 1400
 
-    def __init__(self):
-        self.clients = {}
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    def __init__(self) -> None:
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        
+        self.dpath = 'temp'
+        if not os.path.exists(self.dpath):
+            os.makedirs(self.dpath)
+
+        ip = socket.gethostbyname(socket.gethostname())
+        print('Starting up on {} port {}'.format(ip, self.SERVER_PORT))
+
         self.sock.bind((self.SERVER_ADDRESS, self.SERVER_PORT))
+        self.sock.listen(1)
 
     def start(self):
-        print("Starting server {}".format(self.SERVER_ADDRESS))
-        while True:
-            data, client_address = self.sock.recvfrom(4096)
+        try:
+            while True:
+                connection, client = self.sock.accept()
 
-            usernamelen = int.from_bytes(data[:1], "big")
-            username = data[1:1 + usernamelen].decode("utf-8")
-            message = data[1 + usernamelen:].decode("utf-8")
+                try:
+                    header = connection.recv(64)
+                    json_size = int.from_bytes(header[:16], "big")
+                    media_type_size = int.from_bytes(header[16:17], "big")
+                    payload_size = int.from_bytes(header[17:64], "big")
 
-            # 初回メッセージのみここを通る想定
-            if username not in self.clients:
-                self.clients[username] = {
-                    "name": username,
-                    "address": client_address,
-                    "last_recived_at": datetime.now()
-                }
-                print("New user connected: {}".format(username))
-                continue
-            
-            self.clients[username]["last_recived_at"] = datetime.now()
-            for _, client in self.clients.items():
-                if not client["name"] == username:
-                    send_message = '{}:{}'.format(username, message)
-                    self.sock.sendto(send_message.encode(), client["address"])
+                    print(json_size)
+                    print(media_type_size)
+                    print(payload_size)
 
-    def clean_up(self):
-        while True:
-            over_time = datetime.now() - timedelta(seconds=60)
+                    json_data = connection.recv(json_size)
+                    media_type_data = connection.recv(media_type_size)
+                    data_length = payload_size
+                    with open(os.path.join(self.dpath, "hoge.mp4"), 'wb+') as f:
+                        while data_length > 0:
+                            data = connection.recv(data_length if data_length <= self.STREAM_RATE else self.STREAM_RATE)
+                            
+                            if not data:
+                                break
+                            
+                            f.write(data)
+                            data_length -= len(data)
 
-            clients = self.clients
-            for key, client in list(clients.items()):
-                if client["last_recived_at"] < over_time:
-                    print("Client {} is over".format(client["name"]))
-                    clients.pop(key)
+                    print(json_data.decode())
+                    print(media_type_data.decode())
+                except Exception as e:
+                    print(e)
+                finally:
+                    connection.close()
+                    print("Closed connecton")
+
+        finally:
+            self.sock.close()
+            print("Closed socket")
+
 
 server = Server()
-threading.Thread(target=server.clean_up).start()
 server.start()

@@ -1,50 +1,53 @@
 import socket
-import threading
+import sys
+import os
+import json
+from pathlib import Path
 
 class Client:
-    SERVER_ADDRESS = '172.18.0.4'
+    SERVER_ADDRESS = '172.18.0.3'
     SERVER_PORT = 9001
-    SERVER = (SERVER_ADDRESS, SERVER_PORT)
+    STREAM_RATE = 1400
 
-    def __init__(self):
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.username = ""
-        self.usernamelen = 0
-
-    def create_message(self, message=""):
-        return self.usernamelen.to_bytes(1, "big") + self.username.encode("utf-8") + message.encode("utf-8")
-
-    def login(self):
-        self.username = input("Type username\n")
-        self.usernamelen = len(self.username.encode("utf-8"))
-        message = self.create_message()
-        self.sock.sendto(message, self.SERVER)
+    def __init__(self) -> None:
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        print('Connecting to {}'.format(self.SERVER_ADDRESS, self.SERVER_PORT))
     
     def start(self):
-        threading.Thread(target=self.recv_data).start()
+        try:
+            self.sock.connect((self.SERVER_ADDRESS, self.SERVER_PORT))
+        except socket.error as err:
+            print(err)
+            sys.exit(1)
 
-        while True:
-            message = self.create_message(input())
-            self.sock.sendto(message, self.SERVER)
+        try:
+            method_type = input("Type a conversion method: ")
+            with open("ffmpeg_methods.json", "r") as f:
+                methods = json.load(f)
+            if not method_type in methods:
+                print("Error {} is invalid method".format(method_type))
+                sys.exit(1)
+            method = methods[method_type]
+            json_size = len(json.dumps(method).encode())
 
-    def close(self):
-        print("Close client connection")
-        self.sock.close()
+            file_path = input("Type in a file to upload: ")
+            media_type = Path(file_path).suffix
+            media_type_size = len(media_type.encode())
 
-    def recv_data(self):
-        while True:
-            try:
-                data, _ = self.sock.recvfrom(4096)
+            with open(file_path, "rb") as f:
+                f.seek(0, os.SEEK_END)
+                file_size = f.tell()
+                f.seek(0, 0)
+                
+                header = json_size.to_bytes(16, "big") + media_type_size.to_bytes(1, "big") + file_size.to_bytes(47, "big")
+                body = json.dumps(method).encode() + media_type.encode() + f.read()
 
-                if data:
-                    data = data.decode("utf-8")
-                    print(data)
-            except Exception:
-                break
+            self.sock.send(header)
+            self.sock.send(body)
+
+        finally:
+            print("Closing socket")
+            self.sock.close()
 
 client = Client()
-try:
-    client.login()
-    client.start()
-finally:
-    client.close()
+client.start()
